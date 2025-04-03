@@ -134,7 +134,7 @@ func connect(cfg *config.RabbitMQConfig, log zerolog.Logger) (*amqp.Connection, 
 			Msg("Connecting to RabbitMQ")
 
 		conn, err = amqp.Dial(cfg.RabbitMQURL())
-		if err != nil {
+		if err == nil {
 			log.Info().Msg("Connected to RabbitMQ")
 			return conn, nil
 		}
