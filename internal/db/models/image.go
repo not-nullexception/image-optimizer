@@ -52,7 +52,7 @@ func NewImage(originalName string, originalSize int64, originalWidth, originalHe
 }
 
 // ImageListResponse represents the response for image listing
-type ImagelistResponse struct {
+type ImageListResponse struct {
 	Images []*Image `json:"images"`
 	Total  int      `json:"total"`
 }

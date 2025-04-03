@@ -177,7 +177,7 @@ func (c *RabbitMQClient) Publish(ctx context.Context, task rabbitmq.Task) error 
 
 	c.logger.Debug().
 		Str("task_id", task.ID).
-		Str("task_type", task.Type).
+		Str("task_type", string(task.Type)).
 		Msg("Task published")
 
 	return nil
@@ -263,7 +263,7 @@ func (c *RabbitMQClient) processMessage(ctx context.Context, msg amqp.Delivery, 
 
 	c.logger.Debug().
 		Str("task_id", task.ID).
-		Str("task_type", task.Type).
+		Str("task_type", string(task.Type)).
 		Msg("Processing task")
 
 	err = processFunc(ctx, task)
@@ -273,7 +273,7 @@ func (c *RabbitMQClient) processMessage(ctx context.Context, msg amqp.Delivery, 
 
 	c.logger.Debug().
 		Str("task_id", task.ID).
-		Str("task_type", task.Type).
+		Str("task_type", string(task.Type)).
 		Msg("Task processed successfully")
 
 	return nil

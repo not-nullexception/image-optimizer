@@ -4,9 +4,15 @@ import (
 	"context"
 )
 
+type TaskType string
+
+const (
+	TaskTypeResizeImage TaskType = "resize_image"
+)
+
 type Task struct {
 	ID   string         `json:"id"`
-	Type string         `json:"type"`
+	Type TaskType       `json:"type"`
 	Data map[string]any `json:"data"`
 }
 
