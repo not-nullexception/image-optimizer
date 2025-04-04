@@ -8,6 +8,8 @@ import (
 	"github.com/not-nullexception/image-optimizer/internal/db"
 	"github.com/not-nullexception/image-optimizer/internal/minio"
 	rabbitmq "github.com/not-nullexception/image-optimizer/internal/queue"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func Setup(
@@ -26,12 +28,27 @@ func Setup(
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())
 
+	// Apply metrics middleware if enabled
+	if cfg.Metrics.Enabled {
+		r.Use(middleware.Metrics())
+	}
+
+	// Apply tracing middleware if enabled
+	if cfg.Tracing.Enabled {
+		r.Use(otelgin.Middleware(cfg.Tracing.ServiceName))
+	}
+
 	// Create handlers
 	imageHandler := handlers.NewImageHandler(repository, minioClient, queueClient, cfg)
 	healthHandler := handlers.NewHealthHandler(repository)
 
 	// Health check
 	r.GET("/health", healthHandler.Check)
+
+	// Metrics endpoint
+	if cfg.Metrics.Enabled {
+		r.GET(cfg.Observability.MetricsEndpoint, gin.WrapH(promhttp.Handler()))
+	}
 
 	// API routes
 	api := r.Group("/api")
