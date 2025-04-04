@@ -1,4 +1,5 @@
-.PHONY: build run test clean docker-build docker-up docker-down migrate-up migrate-down lint
+.PHONY: build run test clean docker-build docker-up docker-down migrate-up migrate-down lint docker-migrate
+
 
 # Go parameters
 BINARY_NAME=image-optimizer
@@ -37,6 +38,9 @@ docker-up:
 
 docker-down:
 	docker-compose down
+
+docker-migrate:
+	docker-compose run migrations
 
 # Database migrations
 migrate-up:
