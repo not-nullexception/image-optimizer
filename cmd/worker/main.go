@@ -2,21 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/not-nullexception/image-optimizer/config"
-	"github.com/not-nullexception/image-optimizer/internal/api/router"
 	"github.com/not-nullexception/image-optimizer/internal/db/postgres"
 	"github.com/not-nullexception/image-optimizer/internal/logger"
 	"github.com/not-nullexception/image-optimizer/internal/minio/minio"
 	"github.com/not-nullexception/image-optimizer/internal/queue/rabbitmq"
+	"github.com/not-nullexception/image-optimizer/internal/worker"
 )
 
 func main() {
@@ -54,46 +51,27 @@ func main() {
 	}
 	defer queueClient.Close()
 
-	// Setup router
-	r := router.Setup(cfg, repo, minioClient, queueClient)
+	// Create worker
+	w := worker.New(repo, minioClient, queueClient, cfg)
 
-	// Configure HTTP server
-	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler:      r,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	// Start worker
+	if err := w.Start(ctx); err != nil {
+		log.Fatal().Err(err).Msg("Failed to start worker")
 	}
 
-	// Start HTTP server in a goroutine
-	go func() {
-		log.Info().Str("address", server.Addr).Msg("Starting API server")
-
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("API server failed")
-		}
-	}()
-
-	// Set up signal handling for graceful shutdown
+	// Set up signal handling
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Wait for interruption signal
+	// Wait for interrupt signal
 	<-quit
-	log.Info().Msg("Shutting down API server...")
+	log.Info().Msg("Shutting down worker...")
 
 	// Cancel the context to signal all services to shut down
 	cancel()
 
-	// Create a deadline for the shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
+	// Wait for worker to finish
+	w.Stop()
 
-	// Shut down the server
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatal().Err(err).Msg("API server forced to shutdown")
-	}
-
-	log.Info().Msg("API server stopped")
+	log.Info().Msg("Worker stopped")
 }
