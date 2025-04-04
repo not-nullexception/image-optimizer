@@ -9,12 +9,15 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	MinIO    MinIOConfig
-	RabbitMQ RabbitMQConfig
-	Worker   WorkerConfig
-	Log      LogConfig
+	Server        ServerConfig
+	Database      DatabaseConfig
+	MinIO         MinIOConfig
+	RabbitMQ      RabbitMQConfig
+	Worker        WorkerConfig
+	Log           LogConfig
+	Metrics       MetricsConfig
+	Tracing       TracingConfig
+	Observability ObservabilityConfig
 }
 
 type ServerConfig struct {
@@ -61,7 +64,29 @@ type WorkerConfig struct {
 }
 
 type LogConfig struct {
-	Level string
+	Level       string
+	Format      string
+	ServiceName string
+	OutputJSON  bool
+}
+
+type MetricsConfig struct {
+	Enabled bool
+	Port    int
+}
+
+type TracingConfig struct {
+	Enabled        bool
+	OTLPEndpoint   string
+	ServiceName    string
+	ServiceVersion string
+	Environment    string
+}
+
+type ObservabilityConfig struct {
+	MetricsEndpoint string
+	TracingEndpoint string
+	ProfilerEnabled bool
 }
 
 // ConnectionString generates the connection string for the PostgreSQL database
@@ -135,10 +160,29 @@ func setDefaults() {
 
 	// Worker defaults
 	viper.SetDefault("worker.count", 4)
-	viper.SetDefault("max.workers", 10)
+	viper.SetDefault("worker.max_workers", 10)
 
 	// Log defaults
 	viper.SetDefault("log.level", "info")
+	viper.SetDefault("log.format", "json")
+	viper.SetDefault("log.service.name", "image-optimizer")
+	viper.SetDefault("log.json", true)
+
+	// Metrics defaults
+	viper.SetDefault("metrics.enabled", true)
+	viper.SetDefault("metrics.port", 9090)
+
+	// Tracing defaults
+	viper.SetDefault("tracing.enabled", true)
+	viper.SetDefault("tracing.otlp.endpoint", "tempo:4317")
+	viper.SetDefault("tracing.service.name", "image-optimizer")
+	viper.SetDefault("tracing.service.version", "1.0.0")
+	viper.SetDefault("tracing.environment", "dev")
+
+	// Observability defaults
+	viper.SetDefault("observability.metrics.endpoint", "/metrics")
+	viper.SetDefault("observability.tracing.endpoint", "/traces")
+	viper.SetDefault("observability.profiler.enabled", false)
 }
 
 func unmarshalConfig(config *Config) error {
@@ -178,10 +222,29 @@ func unmarshalConfig(config *Config) error {
 
 	// Worker config
 	config.Worker.Count = viper.GetInt("worker.count")
-	config.Worker.MaxWorkers = viper.GetInt("max.workers")
+	config.Worker.MaxWorkers = viper.GetInt("worker.max_workers")
 
 	// Log config
 	config.Log.Level = viper.GetString("log.level")
+	config.Log.Format = viper.GetString("log.format")
+	config.Log.ServiceName = viper.GetString("log.service.name")
+	config.Log.OutputJSON = viper.GetBool("log.json")
+
+	// Metrics config
+	config.Metrics.Enabled = viper.GetBool("metrics.enabled")
+	config.Metrics.Port = viper.GetInt("metrics.port")
+
+	// Tracing config
+	config.Tracing.Enabled = viper.GetBool("tracing.enabled")
+	config.Tracing.OTLPEndpoint = viper.GetString("tracing.otlp.endpoint")
+	config.Tracing.ServiceName = viper.GetString("tracing.service.name")
+	config.Tracing.ServiceVersion = viper.GetString("tracing.service.version")
+	config.Tracing.Environment = viper.GetString("tracing.environment")
+
+	// Observability config
+	config.Observability.MetricsEndpoint = viper.GetString("observability.metrics.endpoint")
+	config.Observability.TracingEndpoint = viper.GetString("observability.tracing.endpoint")
+	config.Observability.ProfilerEnabled = viper.GetBool("observability.profiler.enabled")
 
 	return nil
 }
