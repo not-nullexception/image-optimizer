@@ -53,7 +53,7 @@ func NewRepository(ctx context.Context, cfg *config.DatabaseConfig) (db.Reposito
 func (r *Repository) GetImageByID(ctx context.Context, id uuid.UUID) (*models.Image, error) {
 	query := `
 		SELECT id, original_name, original_size, original_width, original_height,
-			original_format, original_path, optimized_path, optmized_size,
+			original_format, original_path, optimized_path, optimized_size,
 			optimized_width, optimized_height, status, error, created_at, updated_at
 		FROM images
 		WHERE id = $1
@@ -92,7 +92,7 @@ func (r *Repository) ListImages(ctx context.Context, limit, offset int) ([]*mode
 	var total int
 	err := r.pool.QueryRow(ctx, countQuery).Scan(&total)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error couting images: %w", err)
+		return nil, 0, fmt.Errorf("error counting images: %w", err)
 	}
 
 	rows, err := r.pool.Query(ctx, query, limit, offset)
@@ -122,7 +122,7 @@ func (r *Repository) ListImages(ctx context.Context, limit, offset int) ([]*mode
 	return images, total, nil
 }
 
-// CreateImage creates a neww image record
+// CreateImage creates a new image record
 func (r *Repository) CreateImage(ctx context.Context, image *models.Image) error {
 	query := `
 		INSERT INTO images (

@@ -61,6 +61,7 @@ func NewClient(cfg *config.MinIOConfig) (minio.Client, error) {
 	return mc, nil
 }
 
+// TODO - Check if we need retry logic with backoff
 // UploadImage uploads an image to MinIO
 func (m *MinioClient) UploadImage(ctx context.Context, reader io.Reader, objectName string, contentType string) error {
 	_, err := m.client.PutObject(ctx, m.bucketName, objectName, reader, -1,
@@ -73,6 +74,7 @@ func (m *MinioClient) UploadImage(ctx context.Context, reader io.Reader, objectN
 	return nil
 }
 
+// TODO - Check if we need retry logic with backoff
 // GetImage retrieves an image from MinIO
 func (m *MinioClient) GetImage(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	obj, err := m.client.GetObject(ctx, m.bucketName, objectName, minioLib.GetObjectOptions{})

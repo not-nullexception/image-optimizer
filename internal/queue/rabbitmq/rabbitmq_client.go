@@ -183,6 +183,7 @@ func (c *RabbitMQClient) Publish(ctx context.Context, task rabbitmq.Task) error 
 	return nil
 }
 
+// TODO - Implement dead letter queue on error
 // Consume starts consuming tasks from the queue
 func (c *RabbitMQClient) Consume(ctx context.Context, processFunc rabbitmq.ProcessFunc) error {
 	messages, err := c.channel.Consume(

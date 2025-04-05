@@ -47,7 +47,7 @@ func Init(ctx context.Context, cfg TracingConfig) (func(), error) {
 	// Create OTLP exporter
 	traceExporter, err := otlptracegrpc.New(ctx,
 		otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
-		otlptracegrpc.WithInsecure(), // For development; use TLS in production
+		otlptracegrpc.WithInsecure(), // TODO - Check if is development or production and use secure connection
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)

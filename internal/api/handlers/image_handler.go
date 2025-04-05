@@ -44,6 +44,8 @@ func NewImageHandler(
 
 // UploadImage handles image upload requests
 func (h *ImageHandler) UploadImage(c *gin.Context) {
+	// TODO - Improve input validation
+
 	// Get file from request
 	file, header, err := c.Request.FormFile("image")
 	if err != nil {
@@ -62,6 +64,21 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	ext := filepath.Ext(header.Filename)
 	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported file format, only JPG and PNG are supported"})
+		return
+	}
+
+	// Validate MIME type
+	buffer := make([]byte, 512)
+	_, err = file.Read(buffer)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read file for MIME type validation"})
+		return
+	}
+	file.Seek(0, 0) // Reset file position after reading
+
+	mimeType := http.DetectContentType(buffer)
+	if mimeType != "image/jpeg" && mimeType != "image/png" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported MIME type, only image/jpeg and image/png are supported"})
 		return
 	}
 
