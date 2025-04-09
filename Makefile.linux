@@ -1,0 +1,61 @@
+.PHONY: build run test clean docker-build docker-up docker-down docker-migrate docker-logs docker-run init-linux dev-linux
+
+# Go parameters
+BINARY_NAME=image-optimizer
+API_BINARY=api
+WORKER_BINARY=worker
+BUILD_DIR=./build
+
+# Build the application
+build:
+	mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build -o $(BUILD_DIR)/$(API_BINARY) ./cmd/api
+	CGO_ENABLED=0 go build -o $(BUILD_DIR)/$(WORKER_BINARY) ./cmd/worker
+
+# Run the application locally
+run-api:
+	go run ./cmd/api
+
+run-worker:
+	go run ./cmd/worker
+
+# Run tests
+test:
+	go test -v ./...
+
+# Clean the build directory
+clean:
+	rm -rf $(BUILD_DIR)
+
+# Docker commands
+docker-build:
+	docker-compose build
+
+docker-up:
+	docker-compose --profile dev up -d
+
+docker-down:
+	docker-compose down
+
+docker-migrate:
+	docker-compose run migrations
+
+docker-logs:
+	docker-compose logs -f
+
+# Run the application with Docker
+docker-run: docker-build docker-up
+
+# Install necessary dependencies
+deps:
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/golang/mock/mockgen@latest
+
+# Initialize development environment for Linux
+init-linux: deps
+	cp .env.example .env
+	make docker-build
+
+# All-in-one command to start development on Linux
+dev-linux: init-linux docker-up

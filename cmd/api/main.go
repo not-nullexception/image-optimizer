@@ -33,6 +33,9 @@ func main() {
 	// Setup logger
 	logger.Setup(&cfg.Log)
 
+	// Log the configuration for debugging (make sure to not log sensitive data in production)
+	// log.Info().Interface("config", cfg).Msg("Configuration loaded")
+
 	// Create database repository
 	repo, err := postgres.NewRepository(ctx, &cfg.Database)
 	if err != nil {

@@ -22,9 +22,10 @@ FROM alpine:latest
 
 WORKDIR /app
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata bash
 
 # Copy binary from builder
+COPY .env .env
 COPY --from=builder /app/worker /app/worker
 
 # Copiar o script de espera e o entrypoint do worker

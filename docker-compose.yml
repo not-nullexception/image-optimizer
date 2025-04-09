@@ -11,6 +11,7 @@ services:
       POSTGRES_DB: image_optimizer
     ports:
       - "5432:5432"
+    profiles: ["dev", "prod"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,6 +32,7 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    profiles: ["dev", "prod"]
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -52,6 +54,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    profiles: ["dev", "prod"]
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -59,7 +62,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    
     networks:
       - image-optimizer-network
 
@@ -76,6 +78,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: image_optimizer
       DB_SSL_MODE: disable
+    profiles: ["dev", "prod"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -115,6 +118,7 @@ services:
       LOG_LEVEL: info
     ports:
       - "8080:8080"
+    profiles: ["prod"]
     networks:
       - image-optimizer-network
 
@@ -124,6 +128,7 @@ services:
       context: .
       dockerfile: docker/worker/Dockerfile
     container_name: image-optimizer-worker
+    profiles: ["prod"]
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -146,11 +151,130 @@ services:
     networks:
       - image-optimizer-network
 
+  # Tempo
+  tempo:
+    image: grafana/tempo:latest
+    container_name: image-optimizer-tempo
+    command: ["-config.file=/etc/tempo/tempo-config.yaml"]
+    volumes:
+      - ./docker/tempo/tempo-config.yaml:/etc/tempo/tempo-config.yaml
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200"  # tempo
+      - "4317:4317"  # otlp grpc
+      - "4318:4318"  # otlp http
+    profiles: ["prod"]
+    networks:
+      - image-optimizer-network
+    labels:
+      com.docker.compose.project: image-optimizer
+
+    # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: image-optimizer-otel-collector
+    command: ["--config=/etc/otel-collector/config.yaml"]
+    volumes:
+      - ./docker/otel-collector/config.yaml:/etc/otel-collector/config.yaml
+    ports:
+      - "4316:4317"  # OTLP gRPC receiver
+      - "4319:4318"  # OTLP HTTP receiver
+      - "8889:8889"  # Prometheus exporter
+      - "8888:8888"  # Metrics endpoint
+    profiles: ["prod"]
+    depends_on:
+      - tempo
+    networks:
+      - image-optimizer-network
+    labels:
+      com.docker.compose.project: image-optimizer
+
+   # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: image-optimizer-prometheus
+    ports:
+      - "9090:9090"
+    profiles: ["prod"]
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - image-optimizer-network
+    labels:
+      com.docker.compose.project: image-optimizer
+
+   # Loki for log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: image-optimizer-loki
+    ports:
+      - "3100:3100"
+    profiles: ["prod"]
+    volumes:
+      - ./docker/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - image-optimizer-network
+    labels:
+      com.docker.compose.project: image-optimizer
+
+  # Promtail for log collection
+  promtail:
+    image: grafana/promtail:latest
+    container_name: image-optimizer-promtail
+    volumes:
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    profiles: ["prod"]
+    depends_on:
+      - loki
+    networks:
+      - image-optimizer-network
+    labels:
+      com.docker.compose.project: image-optimizer
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: image-optimizer-grafana
+    ports:
+      - "3000:3000"
+    profiles: ["prod"]
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - image-optimizer-network
+    labels:
+      com.docker.compose.project: image-optimizer
+
 volumes:
   postgres_data:
   minio_data:
   rabbitmq_data:
-
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  tempo_data:
+  
 networks:
   image-optimizer-network:
     driver: bridge

@@ -78,6 +78,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 
 	mimeType := http.DetectContentType(buffer)
 	if mimeType != "image/jpeg" && mimeType != "image/png" {
+		h.logger.Error().Str("filename", header.Filename).Str("mime_type", mimeType).Msg("Unsupported MIME type")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported MIME type, only image/jpeg and image/png are supported"})
 		return
 	}

@@ -28,7 +28,7 @@ func Metrics() gin.HandlerFunc {
 		status := strconv.Itoa(c.Writer.Status())
 
 		// Track total requests
-		metrics.RequestsTotal.WithLabelValues(method, status, path).Inc()
+		metrics.RequestsTotal.WithLabelValues(method, path, status).Inc()
 
 		// Track request duration
 		metrics.RequestDuration.WithLabelValues(method, path).Observe(duration)

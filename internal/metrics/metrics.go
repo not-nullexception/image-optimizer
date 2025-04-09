@@ -13,10 +13,10 @@ var (
 	// RequestsTotal counts the number of HTTP requests received
 	RequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "image_optimizer_request_total",
+			Name: "image_optimizer_requests_total",
 			Help: "The total number of HTTP requests processed by the API",
 		},
-		[]string{"method", "endpoint"},
+		[]string{"method", "endpoint", "status"},
 	)
 
 	// RequestDuration measures the duration of HTTP requests
@@ -35,7 +35,7 @@ var (
 			Name: "image_optimizer_processing_total",
 			Help: "The total number of processed images",
 		},
-		[]string{"method", "endpoint"},
+		[]string{"status"},
 	)
 
 	// ProcessingDuration measures the duration of image processing
@@ -43,7 +43,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "image_optimizer_processing_duration_seconds",
 			Help:    "The duration of image processing in seconds",
-			Buckets: prometheus.ExponentialBuckets(0.1, 2, 20), // From 100ms to ~100s
+			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10), // From 100ms to ~100s
 		},
 		[]string{"status"},
 	)
@@ -53,7 +53,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "image_optimizer_size_reduction_percentage",
 			Help:    "The percentage of size reduction for processed images",
-			Buckets: prometheus.LinearBuckets(0, 10, 11), // From 0% to 100% in 10% increments
+			Buckets: prometheus.LinearBuckets(0, 10, 11), // 0% to 100% in 10% increments
 		},
 	)
 
@@ -62,7 +62,8 @@ var (
 		prometheus.GaugeOpts{
 			Name: "image_optimizer_queue_depth",
 			Help: "The current depth of the processing queue",
-		})
+		},
+	)
 
 	// WorkerUtilization gauges the percentage of workers currently in use
 	WorkerUtilization = promauto.NewGauge(

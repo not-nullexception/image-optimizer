@@ -18,12 +18,13 @@ func Setup(
 	minioClient minio.Client,
 	queueClient rabbitmq.Client,
 ) *gin.Engine {
-	// Set gin mode
+	// Set Gin mode
 	gin.SetMode(cfg.Server.Mode)
 
+	// Create router
 	r := gin.New()
 
-	// Apply middlewares
+	// Apply middleware
 	r.Use(middleware.Logger())
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())

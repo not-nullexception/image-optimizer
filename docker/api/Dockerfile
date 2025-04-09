@@ -19,9 +19,10 @@ FROM alpine:latest
 
 WORKDIR /app
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata bash
 
 # Copiar binário da API e o migrate tool da etapa builder
+COPY .env .env
 COPY --from=builder /app/api /app/api
 COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 
