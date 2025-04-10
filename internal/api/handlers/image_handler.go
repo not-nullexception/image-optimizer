@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -95,9 +96,10 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	file.Seek(0, 0)
 
 	// Generate ID for the image
-	id := uuid.New()
+	imageUUID := uuid.New()
+	h.logger.Info().Str("image_id", imageUUID.String()).Str("filename", header.Filename).Msg("Generated unique ID for new image upload")
 
-	objectName := h.minioClient.GenerateObjectName(id, header.Filename)
+	objectName := h.minioClient.GenerateObjectName(imageUUID, header.Filename)
 
 	// Upload original image to MinIO
 	contentType := "image/jpeg"
@@ -107,17 +109,21 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 
 	err = h.minioClient.UploadImage(c.Request.Context(), file, objectName, contentType)
 	if err != nil {
-		h.logger.Error().Err(err).Str("filename", header.Filename).Msg("Failed to upload image")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
+		h.logger.Error().Err(err).Str("filename", header.Filename).Msg("Failed to upload image to storage")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image to storage"})
 		return
 	}
 
 	// Create image record in database
-	img := models.NewImage(header.Filename, size, width, height, format, objectName)
+	img := models.NewImageWithID(imageUUID, header.Filename, size, width, height, format, objectName)
 
 	err = h.repo.CreateImage(c.Request.Context(), img)
 	if err != nil {
-		h.logger.Error().Err(err).Str("id", id.String()).Msg("Failed to save image metadata")
+		h.logger.Error().Err(err).Str("id", imageUUID.String()).Msg("Failed to save image metadata to database")
+		cleanupErr := h.minioClient.DeleteImage(context.Background(), objectName)
+		if cleanupErr != nil {
+			h.logger.Error().Err(cleanupErr).Str("object_name", objectName).Msg("Failed to cleanup MinIO object after DB error")
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image metadata"})
 		return
 	}
@@ -154,14 +160,14 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 
 	err = h.queueClient.Publish(c.Request.Context(), task)
 	if err != nil {
-		h.logger.Error().Err(err).Str("id", id.String()).Msg("Failed to queue image for processing")
+		h.logger.Error().Err(err).Str("id", imageUUID.String()).Msg("Failed to queue image for processing")
 		// Continue anyway, as we have stored the original image
 		// TODO - consider adding a retry mechanism or a dead-letter queue
 	}
 
 	// Return image ID
 	c.JSON(http.StatusAccepted, &models.ImageUploadResponse{
-		ID:     id,
+		ID:     imageUUID,
 		Status: string(models.StatusPending),
 	})
 }

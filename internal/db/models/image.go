@@ -51,6 +51,23 @@ func NewImage(originalName string, originalSize int64, originalWidth, originalHe
 	}
 }
 
+// NewImageWithID creates a new Image with a specific ID and default values
+func NewImageWithID(id uuid.UUID, originalName string, originalSize int64, originalWidth, originalHeight int, originalFormat, originalPath string) *Image {
+	now := time.Now()
+	return &Image{
+		ID:             id,
+		OriginalName:   originalName,
+		OriginalSize:   originalSize,
+		OriginalWidth:  originalWidth,
+		OriginalHeight: originalHeight,
+		OriginalFormat: originalFormat,
+		OriginalPath:   originalPath,
+		Status:         StatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+}
+
 // ImageListResponse represents the response for image listing
 type ImageListResponse struct {
 	Images []*Image `json:"images"`

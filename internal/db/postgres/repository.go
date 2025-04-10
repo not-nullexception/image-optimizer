@@ -101,7 +101,7 @@ func (r *Repository) ListImages(ctx context.Context, limit, offset int) ([]*mode
 	}
 	defer rows.Close()
 
-	var images []*models.Image
+	images := make([]*models.Image, 0)
 	for rows.Next() {
 		var img models.Image
 		err := rows.Scan(
