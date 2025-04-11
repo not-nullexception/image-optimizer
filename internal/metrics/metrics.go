@@ -88,8 +88,6 @@ var (
 			Help: "The number of active database connections",
 		},
 	)
-
-	log = logger.GetLogger("metrics")
 )
 
 // RecordProcessingTime records the time taken to process an image
@@ -98,14 +96,16 @@ func RecordProcessingTime(ctx context.Context, status string, startTime time.Tim
 	ProcessingDuration.WithLabelValues(status).Observe(duration)
 	ProcessingTotal.WithLabelValues(status).Inc()
 
-	log.Debug().
+	reqLogger := logger.FromContext(ctx)
+
+	reqLogger.Debug().
 		Str("status", status).
 		Float64("duration_seconds", duration).
 		Msg("Recorded image processing time")
 }
 
 // RecordSizeReduction records the percentage of size reduction
-func RecordSizeReduction(originalSize, optimizedSize int64) {
+func RecordSizeReduction(ctx context.Context, originalSize, optimizedSize int64) {
 	if originalSize <= 0 {
 		return
 	}
@@ -113,7 +113,9 @@ func RecordSizeReduction(originalSize, optimizedSize int64) {
 	percentage := (1 - (float64(optimizedSize) / float64(originalSize))) * 100
 	ImageSizeReduction.Observe(percentage)
 
-	log.Debug().
+	reqLogger := logger.FromContext(ctx)
+
+	reqLogger.Debug().
 		Int64("original_size", originalSize).
 		Int64("optimized_size", optimizedSize).
 		Float64("reduction_percentage", percentage).
@@ -147,5 +149,6 @@ func UpdateDBConnections(connections int) {
 
 // Init initializes metrics collection
 func Init() {
-	log.Info().Msg("Metrics collection initialized")
+	logger := logger.GetLogger("metrics")
+	logger.Info().Msg("Metrics collection initialized")
 }

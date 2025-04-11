@@ -7,12 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/not-nullexception/image-optimizer/internal/db"
 	"github.com/not-nullexception/image-optimizer/internal/logger"
-	"github.com/rs/zerolog"
 )
 
 type HealthHandler struct {
-	repo   db.Repository
-	logger zerolog.Logger
+	repo db.Repository
 }
 
 type HeathResponse struct {
@@ -24,13 +22,15 @@ type HeathResponse struct {
 
 func NewHealthHandler(repo db.Repository) *HealthHandler {
 	return &HealthHandler{
-		repo:   repo,
-		logger: logger.GetLogger("health-handler"),
+		repo: repo,
 	}
 }
 
 // Check handles heath check requests
 func (h *HealthHandler) Check(c *gin.Context) {
+	reqLogger := logger.FromContext(c.Request.Context())
+	reqLogger.Info().Msg("Processing health check request")
+
 	response := HeathResponse{
 		Status:    "UP",
 		Timestamp: time.Now(),
@@ -40,10 +40,11 @@ func (h *HealthHandler) Check(c *gin.Context) {
 
 	err := h.repo.Ping(c.Request.Context())
 	if err != nil {
-		h.logger.Error().Err(err).Msg("Database health check failed")
+		reqLogger.Error().Err(err).Msg("Database health check failed")
 		response.Status = "DEGRADED"
 		response.DB = "DOWN"
 	}
 
+	reqLogger.Info().Msg("Health check successful")
 	c.JSON(http.StatusOK, response)
 }

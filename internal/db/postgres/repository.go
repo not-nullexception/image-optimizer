@@ -13,16 +13,14 @@ import (
 	"github.com/not-nullexception/image-optimizer/internal/db"
 	"github.com/not-nullexception/image-optimizer/internal/db/models"
 	"github.com/not-nullexception/image-optimizer/internal/logger"
-	"github.com/rs/zerolog"
 )
 
 type Repository struct {
-	pool   *pgxpool.Pool
-	logger zerolog.Logger
+	pool *pgxpool.Pool
 }
 
 func NewRepository(ctx context.Context, cfg *config.DatabaseConfig) (db.Repository, error) {
-	log := logger.GetLogger("postgres-repository")
+	initLogger := logger.GetLogger("postgres-repository")
 
 	// Create a connection pool configuration
 	poolConfig, err := pgxpool.ParseConfig(cfg.ConnectionString())
@@ -45,12 +43,14 @@ func NewRepository(ctx context.Context, cfg *config.DatabaseConfig) (db.Reposito
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
 
-	log.Info().Msg("Connected to Postgres database")
-	return &Repository{pool: pool, logger: log}, nil
+	initLogger.Info().Msg("Connected to Postgres database")
+	return &Repository{pool: pool}, nil
 }
 
 // GetImageByID retrieves an image by its ID
 func (r *Repository) GetImageByID(ctx context.Context, id uuid.UUID) (*models.Image, error) {
+	reqLogger := logger.FromContext(ctx)
+
 	query := `
 		SELECT id, original_name, original_size, original_width, original_height,
 			original_format, original_path, optimized_path, optimized_size,
@@ -58,6 +58,9 @@ func (r *Repository) GetImageByID(ctx context.Context, id uuid.UUID) (*models.Im
 		FROM images
 		WHERE id = $1
 	`
+
+	reqLogger.Debug().Str("image_id", id.String()).Msg("Executing GetImageByID query")
+
 	var img models.Image
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&img.ID, &img.OriginalName, &img.OriginalSize, &img.OriginalWidth, &img.OriginalHeight,
@@ -67,11 +70,15 @@ func (r *Repository) GetImageByID(ctx context.Context, id uuid.UUID) (*models.Im
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			reqLogger.Warn().Err(err).Str("image_id", id.String()).Msg("Image not found")
 			return nil, fmt.Errorf("image not found: %w", err)
 		}
+
+		reqLogger.Error().Err(err).Str("image_id", id.String()).Msg("Error querying image")
 		return nil, fmt.Errorf("error querying image: %w", err)
 	}
 
+	reqLogger.Debug().Str("image_id", id.String()).Msg("Image retrieved successfully")
 	return &img, nil
 }
 
