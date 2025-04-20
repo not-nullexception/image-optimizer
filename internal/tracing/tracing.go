@@ -159,21 +159,3 @@ func RecordError(ctx context.Context, err error) {
 
 	span.RecordError(err)
 }
-
-// GetLoggerFromContext extracts tracing information and creates a logger
-func GetLoggerFromContext(ctx context.Context, component string) zerolog.Logger {
-	span := trace.SpanFromContext(ctx)
-	logger := logger.GetLogger(component)
-
-	if span.IsRecording() {
-		spanCtx := span.SpanContext()
-		if spanCtx.IsValid() {
-			logger = logger.With().
-				Str("trace_id", spanCtx.TraceID().String()).
-				Str("span_id", spanCtx.SpanID().String()).
-				Logger()
-		}
-	}
-
-	return logger
-}
