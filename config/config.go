@@ -61,8 +61,9 @@ type RabbitMQConfig struct {
 }
 
 type WorkerConfig struct {
-	Count      int
-	MaxWorkers int
+	Count       int
+	MaxWorkers  int
+	MetricsPort int
 }
 
 type LogConfig struct {
@@ -149,8 +150,9 @@ func Load() (*Config, error) {
 			ConsumerTag: getEnv("RABBITMQ_CONSUMER_TAG", "image_worker"),
 		},
 		Worker: WorkerConfig{
-			Count:      getEnvAsInt("WORKER_COUNT", 4),
-			MaxWorkers: getEnvAsInt("MAX_WORKERS", 10),
+			Count:       getEnvAsInt("WORKER_COUNT", 4),
+			MaxWorkers:  getEnvAsInt("MAX_WORKERS", 10),
+			MetricsPort: getEnvAsInt("WORKER_METRICS_PORT", 9091),
 		},
 		Log: LogConfig{
 			Level:       getEnv("LOG_LEVEL", "info"),
@@ -164,7 +166,7 @@ func Load() (*Config, error) {
 		},
 		Tracing: TracingConfig{
 			Enabled:        getEnvAsBool("TRACING_ENABLED", true),
-			OTLPEndpoint:   getEnv("TRACING_OTLP_ENDPOINT", "tempo:4317"),
+			OTLPEndpoint:   getEnv("TRACING_OTLP_ENDPOINT", "otel-collector:4317"),
 			ServiceName:    getEnv("TRACING_SERVICE_NAME", "image-optimizer"),
 			ServiceVersion: getEnv("TRACING_SERVICE_VERSION", "1.0.0"),
 			Environment:    getEnv("TRACING_ENVIRONMENT", "dev"),

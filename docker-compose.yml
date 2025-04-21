@@ -115,6 +115,9 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: guest
       RABBITMQ_PASSWORD: guest
+      TRACING_ENABLED: 'true'
+      TRACING_OTLP_ENDPOINT: 'otel-collector:4317'
+      TRACING_SERVICE_NAME: 'image-optimizer-api'
       LOG_LEVEL: info
     ports:
       - "8080:8080"
@@ -128,7 +131,9 @@ services:
       context: .
       dockerfile: docker/worker/Dockerfile
     container_name: image-optimizer-worker
-    profiles: ["prod"]
+    profiles: [ "prod" ]
+    ports:
+      - "9091:9091"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -147,13 +152,30 @@ services:
       RABBITMQ_PASSWORD: guest
       WORKER_COUNT: 4
       MAX_WORKERS: 10
+      WORKER_METRICS_PORT: '9091'
       LOG_LEVEL: info
+      TRACING_ENABLED: 'true'
+      TRACING_OTLP_ENDPOINT: 'otel-collector:4317'
+      TRACING_SERVICE_NAME: 'image-optimizer-worker'
+      TRACING_SERVICE_VERSION: '1.0.0'
+      TRACING_ENVIRONMENT: 'production'
+      METRICS_ENABLED: 'true'
+      # METRICS_PORT: 9091 # Poderia configurar a porta aqui e ler no main.go
+    depends_on: # Opcional, mas recomendado
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
     networks:
       - image-optimizer-network
 
   # Tempo
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.7.2
     container_name: image-optimizer-tempo
     command: ["-config.file=/etc/tempo/tempo-config.yaml"]
     volumes:
@@ -171,14 +193,14 @@ services:
 
     # OpenTelemetry Collector
   otel-collector:
-    image: otel/opentelemetry-collector:latest
+    image: otel/opentelemetry-collector:0.123.0
     container_name: image-optimizer-otel-collector
     command: ["--config=/etc/otel-collector/config.yaml"]
     volumes:
       - ./docker/otel-collector/config.yaml:/etc/otel-collector/config.yaml
     ports:
-      - "4316:4317"  # OTLP gRPC receiver
-      - "4319:4318"  # OTLP HTTP receiver
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver
       - "8889:8889"  # Prometheus exporter
       - "8888:8888"  # Metrics endpoint
     profiles: ["prod"]
@@ -191,7 +213,7 @@ services:
 
    # Prometheus for metrics collection
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.3.0
     container_name: image-optimizer-prometheus
     ports:
       - "9090:9090"
@@ -211,7 +233,7 @@ services:
 
    # Loki for log aggregation
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.14
     container_name: image-optimizer-loki
     ports:
       - "3100:3100"
@@ -227,7 +249,7 @@ services:
 
   # Promtail for log collection
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:2.9.14
     container_name: image-optimizer-promtail
     volumes:
       - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml
@@ -244,7 +266,7 @@ services:
 
   # Grafana for metrics visualization
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.6.0
     container_name: image-optimizer-grafana
     ports:
       - "3000:3000"
