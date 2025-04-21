@@ -154,10 +154,16 @@ func connect(cfg *config.RabbitMQConfig, log zerolog.Logger) (*amqp.Connection, 
 
 // Publish publishes a task to the queue
 func (c *RabbitMQClient) Publish(ctx context.Context, task rabbitmq.Task) error {
+	reqLogger :=
+		logger.FromContext(ctx).With().Str("component", "rabbitmq-client").Logger()
+
 	body, err := json.Marshal(task)
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Error marshaling task")
 		return fmt.Errorf("error marshaling task: %w", err)
 	}
+
+	reqLogger.Debug().Msg("Publishing task")
 
 	err = c.channel.PublishWithContext(
 		ctx,
@@ -172,6 +178,7 @@ func (c *RabbitMQClient) Publish(ctx context.Context, task rabbitmq.Task) error 
 		},
 	)
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Error publishing message")
 		return fmt.Errorf("error publishing message: %w", err)
 	}
 
@@ -180,12 +187,14 @@ func (c *RabbitMQClient) Publish(ctx context.Context, task rabbitmq.Task) error 
 		Str("task_type", string(task.Type)).
 		Msg("Task published")
 
+	c.logger.Debug().Msg("Task published")
 	return nil
 }
 
-// TODO - Implement dead letter queue on error
+// Consume TODO - Implement dead letter queue on error
 // Consume starts consuming tasks from the queue
 func (c *RabbitMQClient) Consume(ctx context.Context, processFunc rabbitmq.ProcessFunc) error {
+	reqLogger := logger.FromContext(ctx).With().Str("component", "rabbitmq-client").Logger()
 	messages, err := c.channel.Consume(
 		c.queueName,   // queue
 		c.consumerTag, // consumer
@@ -196,6 +205,7 @@ func (c *RabbitMQClient) Consume(ctx context.Context, processFunc rabbitmq.Proce
 		nil,           // args
 	)
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Error consuming from queue")
 		return fmt.Errorf("error consuming from queue: %w", err)
 	}
 

@@ -46,7 +46,9 @@ func New(minioClient minio.Client) *Processor {
 
 // ProcessImage processes an image from MinIO
 func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, originalPath string, filename string, config Config) (*ProcessingResult, error) {
-	p.logger.Info().
+	reqLogger := logger.FromContext(ctx).With().Str("component", "image-processor").Logger()
+
+	reqLogger.Info().
 		Str("image_id", imageID.String()).
 		Str("path", originalPath).
 		Msg("Processing image")
@@ -54,6 +56,7 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 	// Get the image from MinIO
 	reader, err := p.minioClient.GetImage(ctx, originalPath)
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Failed to get image from MinIO")
 		return nil, fmt.Errorf("error getting image from MinIO: %w", err)
 	}
 	defer reader.Close()
@@ -61,12 +64,14 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 	// Read the entire image into memory
 	imgData, err := io.ReadAll(reader)
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Failed to read image data")
 		return nil, fmt.Errorf("error reading image data: %w", err)
 	}
 
 	// Decode the image
 	img, format, err := image.Decode(bytes.NewReader(imgData))
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Failed to decode image")
 		return nil, fmt.Errorf("error decoding image: %w", err)
 	}
 
@@ -75,7 +80,7 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 	originalWidth := bounds.Dx()
 	originalHeight := bounds.Dy()
 
-	p.logger.Debug().
+	reqLogger.Debug().
 		Str("image_id", imageID.String()).
 		Str("format", format).
 		Int("original_width", originalWidth).
@@ -112,14 +117,14 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 	var resizedImg image.Image
 	if newWidth != originalWidth || newHeight != originalHeight {
 		resizedImg = imaging.Resize(img, newWidth, newHeight, imaging.Lanczos)
-		p.logger.Debug().
+		reqLogger.Debug().
 			Str("image_id", imageID.String()).
 			Int("new_width", newWidth).
 			Int("new_height", newHeight).
 			Msg("Image resized")
 	} else {
 		resizedImg = img
-		p.logger.Debug().
+		reqLogger.Debug().
 			Str("image_id", imageID.String()).
 			Msg("No resizing needed")
 	}
@@ -148,10 +153,12 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 		}
 		processingErr = encoder.Encode(&buf, resizedImg)
 	default:
+		reqLogger.Info().Msg("Unsupported image format")
 		return nil, fmt.Errorf("unsupported image format: %s", format)
 	}
 
 	if processingErr != nil {
+		reqLogger.Error().Err(processingErr).Msg("Failed to encode processed image")
 		return nil, fmt.Errorf("error encoding processed image: %w", processingErr)
 	}
 
@@ -163,10 +170,11 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 		// Upload the processed image to MinIO
 		err = p.minioClient.UploadImage(ctx, bytes.NewReader(processedImgData), optimizedPath, contentType)
 		if err != nil {
+			reqLogger.Error().Err(err).Msg("Failed to upload processed image")
 			return nil, fmt.Errorf("error uploading processed image: %w", err)
 		}
 
-		p.logger.Info().
+		reqLogger.Info().
 			Str("image_id", imageID.String()).
 			Int("original_size", len(imgData)).
 			Int("processed_size", len(processedImgData)).
@@ -181,8 +189,8 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 		}, nil
 	}
 
-	// If no optimization was achieved and we're not forcing optimization, use the original
-	p.logger.Info().
+	// If no optimization was achieved, and we're not forcing optimization, use the original
+	reqLogger.Info().
 		Str("image_id", imageID.String()).
 		Msg("No optimization achieved, using original image")
 
@@ -195,21 +203,28 @@ func (p *Processor) ProcessImage(ctx context.Context, imageID uuid.UUID, origina
 }
 
 // ValidateImage checks if an image is valid and returns its dimensions and size
-func (p *Processor) ValidateImage(reader io.Reader) (int, int, int64, string, error) {
+func (p *Processor) ValidateImage(ctx context.Context, reader io.Reader) (int, int, int64, string, error) {
+	reqLogger := logger.FromContext(ctx).With().Str("component", "image-validator").Logger()
+
+	reqLogger.Info().Msg("Validating image")
+
 	// Read the entire image into memory
 	imgData, err := io.ReadAll(reader)
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Failed to read image data")
 		return 0, 0, 0, "", fmt.Errorf("error reading image data: %w", err)
 	}
 
 	// Decode the image
 	img, format, err := image.Decode(bytes.NewReader(imgData))
 	if err != nil {
+		reqLogger.Error().Err(err).Msg("Failed to decode image")
 		return 0, 0, 0, "", fmt.Errorf("error decoding image: %w", err)
 	}
 
 	// Check if format is supported
 	if format != "jpeg" && format != "png" {
+		reqLogger.Error().Msg("Unsupported image format")
 		return 0, 0, 0, "", fmt.Errorf("unsupported image format: %s", format)
 	}
 
@@ -218,6 +233,15 @@ func (p *Processor) ValidateImage(reader io.Reader) (int, int, int64, string, er
 	width := bounds.Dx()
 	height := bounds.Dy()
 	size := int64(len(imgData))
+
+	reqLogger.Debug().
+		Int("width", width).
+		Int("height", height).
+		Int64("size", size).
+		Str("format", format).
+		Msg("Image details")
+
+	reqLogger.Info().Msg("Image validated successfully")
 
 	return width, height, size, format, nil
 }

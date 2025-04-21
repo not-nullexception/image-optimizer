@@ -89,7 +89,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	}
 
 	// Validate the image and get dimensions
-	width, height, size, format, err := h.processor.ValidateImage(file)
+	width, height, size, format, err := h.processor.ValidateImage(c.Request.Context(), file)
 	if err != nil {
 		reqLogger.Error().Err(err).Str("filename", header.Filename).Msg("Invalid image")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image: " + err.Error()})
